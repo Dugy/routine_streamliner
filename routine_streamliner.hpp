@@ -40,7 +40,7 @@ public:
 	* \param Callback function that receives a vector of pointers to objects that are called
 	* \param Time difference that can be joined into one callback function call
 	*/
-	RoutineStreamliner(std::chrono::system_clock::duration imprecisionPermitted, std::function<void(const std::vector<T*>&)> merger) :
+	inline RoutineStreamliner(std::chrono::system_clock::duration imprecisionPermitted, std::function<void(const std::vector<T*>&)> merger) :
 	_imprecisionPermitted(imprecisionPermitted), _merger(merger)
 	{
 		_worker = std::unique_ptr<LoopingThread>(new LoopingThread(std::chrono::system_clock::duration(STREAMLINER_WAIT_IF_EMPTY), [this] {
@@ -48,13 +48,16 @@ public:
 			std::chrono::system_clock::time_point until = start + _imprecisionPermitted;
 
 			std::vector<T*> merged;
-			for(auto it = _entries.begin(); it != _entries.end();) {
-				if(it->first > until) break;
+			{
+				std::lock_guard<std::mutex> lock(_lock);
+				for(auto it = _entries.begin(); it != _entries.end();) {
+					if(it->first > until) break;
 
-				std::unique_ptr<Subscription> contents = std::move(it->second);
-				merged.push_back(&contents->data);
-				_entries.insert(std::make_pair(it->first + contents->period, std::move(contents)));
-				it = _entries.erase(it);
+					std::unique_ptr<Subscription> contents = std::move(it->second);
+					merged.push_back(&contents->data);
+					_entries.insert(std::make_pair(it->first + contents->period, std::move(contents)));
+					it = _entries.erase(it);
+				}
 			}
 			if(!merged.empty())
 				_merger(merged);
@@ -69,7 +72,7 @@ public:
 	/*!
 	* \brief Destructor
 	*/
-	~RoutineStreamliner()
+	inline ~RoutineStreamliner()
 	{
 	}
 
@@ -80,7 +83,7 @@ public:
 	* \param The period of giving pointers to this object to the function given in constructor
 	* \return An identifier of the object that can be used to remove this periodic action
 	*/
-	unsigned int add(const T& data, std::chrono::system_clock::duration period)
+	inline unsigned int add(const T& data, std::chrono::system_clock::duration period)
 	{
 		std::lock_guard<std::mutex> lock(_lock);
 		_entries.insert(std::make_pair(std::chrono::system_clock::now(), std::unique_ptr<Subscription>(new Subscription{ data, period, identifier })));
@@ -94,7 +97,7 @@ public:
 	* \param The period of giving pointers to this object to the function given in constructor
 	* \return An identifier of the object that can be used to remove this periodic action
 	*/
-	unsigned int add(T&& data, std::chrono::system_clock::duration period)
+	inline unsigned int add(T&& data, std::chrono::system_clock::duration period)
 	{
 		std::lock_guard<std::mutex> lock(_lock);
 		_entries.insert(std::make_pair(std::chrono::system_clock::now(), std::unique_ptr<Subscription>(new Subscription{ data, period, identifier })));
@@ -106,7 +109,7 @@ public:
 	*
 	* \param An identifier of the action that was returned by the add() method
 	*/
-	void remove(unsigned int identifier)
+	inline void remove(unsigned int identifier)
 	{
 		std::lock_guard<std::mutex> lock(_lock);
 		for(auto it = _entries.begin(); it != _entries.end(); ++it) {
