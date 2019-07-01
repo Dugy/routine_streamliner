@@ -28,6 +28,10 @@ repeater.add("1.3s", std::chrono::milliseconds(1300));
 
 ```
 
+## Preventing too many calls
+
+If you don't want functions to be called too many times, you can use `setThrottling()` that will limit the number of calls of a function to 1 per cycle. It can be set as also as an additional argument to the constructor.
+
 ## Troubleshooting
 
 Error message `undefined reference to 'pthread_create'` means that you need to add `-lpthread` to the compiler options.

@@ -25,6 +25,7 @@ class RoutineStreamliner {
 		unsigned int identifier;
 	};
 	bool _exit = false;
+	bool _throttling = false;
 	std::mutex _lock;
 	std::chrono::system_clock::duration _imprecisionPermitted;
 	std::function<void(const std::vector<T*>&)> _merger;
@@ -39,9 +40,10 @@ public:
 	*
 	* \param Callback function that receives a vector of pointers to objects that are called
 	* \param Time difference that can be joined into one callback function call
+	* \param Whether throttling (discarding of identical routines if they would be run in the same tick) should be enabled
 	*/
-	inline RoutineStreamliner(std::chrono::system_clock::duration imprecisionPermitted, std::function<void(const std::vector<T*>&)> merger) :
-	_imprecisionPermitted(imprecisionPermitted), _merger(merger)
+	inline RoutineStreamliner(std::chrono::system_clock::duration imprecisionPermitted, std::function<void(const std::vector<T*>&)> merger, bool throttling = false) :
+	_throttling(throttling), _imprecisionPermitted(imprecisionPermitted), _merger(merger)
 	{
 		_worker = std::unique_ptr<LoopingThread>(new LoopingThread(std::chrono::system_clock::duration(STREAMLINER_WAIT_IF_EMPTY), [this] {
 			std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
@@ -55,7 +57,12 @@ public:
 
 					std::unique_ptr<Subscription> contents = std::move(it->second);
 					merged.push_back(&contents->data);
-					_entries.insert(std::make_pair(it->first + contents->period, std::move(contents)));
+
+					std::chrono::system_clock::time_point next = it->first + contents->period;
+					if (_throttling) while (next < until) {
+						next += contents->period;
+					}
+					_entries.insert(std::make_pair(next, std::move(contents)));
 					it = _entries.erase(it);
 				}
 			}
@@ -119,5 +126,14 @@ public:
 			}
 		}
 		throw(std::logic_error("Unregistering streamlined action that isn't registered"));
+	}
+
+	/*!
+	* \brief Sets throttling (discarding of identical routines if they would be run in the same tick) on and off
+	*
+	* \param Whether it should be throttling or not
+	*/
+	inline void setThrottling(bool throttling) {
+		_throttling = throttling;
 	}
 };
