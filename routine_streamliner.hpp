@@ -21,16 +21,16 @@ template<typename T>
 class RoutineStreamliner {
 	struct Subscription {
 		T data;
-		std::chrono::system_clock::duration period;
+		std::chrono::steady_clock::duration period;
 		unsigned int identifier;
 	};
 	bool _exit = false;
 	bool _throttling = false;
 	std::mutex _lock;
-	std::chrono::system_clock::duration _imprecisionPermitted;
+	std::chrono::steady_clock::duration _imprecisionPermitted;
 	std::function<void(const std::vector<T*>&)> _merger;
 	unsigned int identifier = 0;
-	std::multimap<std::chrono::system_clock::time_point, std::unique_ptr<Subscription>> _entries;
+	std::multimap<std::chrono::steady_clock::time_point, std::unique_ptr<Subscription>> _entries;
 	std::unique_ptr<LoopingThread> _worker;
 
 public:
@@ -42,12 +42,12 @@ public:
 	* \param Time difference that can be joined into one callback function call
 	* \param Whether throttling (discarding of identical routines if they would be run in the same tick) should be enabled
 	*/
-	inline RoutineStreamliner(std::chrono::system_clock::duration imprecisionPermitted, std::function<void(const std::vector<T*>&)> merger, bool throttling = false) :
+	inline RoutineStreamliner(std::chrono::steady_clock::duration imprecisionPermitted, std::function<void(const std::vector<T*>&)> merger, bool throttling = false) :
 	_throttling(throttling), _imprecisionPermitted(imprecisionPermitted), _merger(merger)
 	{
-		_worker = std::unique_ptr<LoopingThread>(new LoopingThread(std::chrono::system_clock::duration(STREAMLINER_WAIT_IF_EMPTY), [this] {
-			std::chrono::system_clock::time_point start = std::chrono::system_clock::now();
-			std::chrono::system_clock::time_point until = start + _imprecisionPermitted;
+		_worker = std::unique_ptr<LoopingThread>(new LoopingThread(std::chrono::steady_clock::duration(STREAMLINER_WAIT_IF_EMPTY), [this] {
+			std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+			std::chrono::steady_clock::time_point until = start + _imprecisionPermitted;
 
 			std::vector<T*> merged;
 			{
@@ -58,7 +58,7 @@ public:
 					std::unique_ptr<Subscription> contents = std::move(it->second);
 					merged.push_back(&contents->data);
 
-					std::chrono::system_clock::time_point next = it->first + contents->period;
+					std::chrono::steady_clock::time_point next = it->first + contents->period;
 					if (_throttling) while (next < until) {
 						next += contents->period;
 					}
@@ -70,7 +70,7 @@ public:
 				_merger(merged);
 
 			if(!_entries.empty()) {
-				std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+				std::chrono::steady_clock::time_point now = std::chrono::steady_clock::now();
 				_worker->setPeriod(_entries.begin()->first - start);
 			}
 		}));
@@ -90,10 +90,10 @@ public:
 	* \param The period of giving pointers to this object to the function given in constructor
 	* \return An identifier of the object that can be used to remove this periodic action
 	*/
-	inline unsigned int add(const T& data, std::chrono::system_clock::duration period)
+	inline unsigned int add(const T& data, std::chrono::steady_clock::duration period)
 	{
 		std::lock_guard<std::mutex> lock(_lock);
-		_entries.insert(std::make_pair(std::chrono::system_clock::now(), std::unique_ptr<Subscription>(new Subscription{ data, period, identifier })));
+		_entries.insert(std::make_pair(std::chrono::steady_clock::now(), std::unique_ptr<Subscription>(new Subscription{ data, period, identifier })));
 		return identifier++;
 	}
 
@@ -104,10 +104,10 @@ public:
 	* \param The period of giving pointers to this object to the function given in constructor
 	* \return An identifier of the object that can be used to remove this periodic action
 	*/
-	inline unsigned int add(T&& data, std::chrono::system_clock::duration period)
+	inline unsigned int add(T&& data, std::chrono::steady_clock::duration period)
 	{
 		std::lock_guard<std::mutex> lock(_lock);
-		_entries.insert(std::make_pair(std::chrono::system_clock::now(), std::unique_ptr<Subscription>(new Subscription{ data, period, identifier })));
+		_entries.insert(std::make_pair(std::chrono::steady_clock::now(), std::unique_ptr<Subscription>(new Subscription{ data, period, identifier })));
 		return identifier++;
 	}
 
