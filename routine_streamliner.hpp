@@ -15,7 +15,7 @@
 #include <memory>
 #include "looping_thread/looping_thread.hpp"
  
-constexpr int STREAMLINER_WAIT_IF_EMPTY = 500;
+constexpr int STREAMLINER_WAIT_IF_EMPTY = 500000000; // in ns
  
 template<typename T>
 class RoutineStreamliner {
