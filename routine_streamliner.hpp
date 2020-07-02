@@ -136,4 +136,13 @@ public:
 	inline void setThrottling(bool throttling) {
 		_throttling = throttling;
 	}
+
+	/*!
+	* \brief Changes looping thread error callback
+	* \param errorCallback function which is called when exception is thrown in looping thread routine
+	*/
+	inline void setErrorCallback(std::function<void(const std::exception&)> errorCallback)
+	{
+		_worker->setErrorCallback(errorCallback);
+	}
 };
